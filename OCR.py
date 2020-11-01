@@ -5,9 +5,12 @@ import tkinter.scrolledtext as scrolledtext
 import cv2
 import pytesseract
 from PIL import Image
+import mysql.connector
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 cong = r'--oem 2 --psm 6'
+
+login_flag = 0
 filename = ''
 
 def browse():
@@ -102,14 +105,10 @@ def camera():
                 img_new = cv2.imshow("Captured Image", img_new)
                 cv2.waitKey(1650)
                 cv2.destroyAllWindows()
-                # print("Processing image...")
+
                 img_ = cv2.imread('saved_img.png', cv2.IMREAD_ANYCOLOR)
-                # print("Converting RGB image to grayscale...")
                 gray = cv2.cvtColor(img_, cv2.COLOR_BGR2GRAY)
-                # print("Converted RGB image to grayscale...")
-                print("Resizing image to scale...")
                 img_ = cv2.resize(gray, (700,600))
-                # print("Resized...")
                 img_resized = cv2.imwrite(filename='saved_img-final.png', img=img_)
                 print("Image saved!")
                 filename = 'saved_img-final.png'
@@ -155,69 +154,133 @@ def contribute():
     if p == False:
         tmsg.showinfo("Feedback", "Thank you for valuable feedback.\nWe will work harder")
 
-root = Tk()
-root.geometry('1080x720')
-root.title('Digital OCR')
+def login():
+    lg = Tk()
+    lg.geometry('360x400')
+    lg.title('Login/Sign-Up')
 
-# photo = PhotoImage(file = 'ICON.png')
-# root.iconphoto(False, photo)
+    loginid = StringVar()
+    passW = StringVar()
 
-# menu
-main_menu = Menu(root)
-sub_menu1 = Menu(main_menu,  tearoff= 0)
-sub_menu1.add_command(label= 'Open File', command=browse)
-sub_menu1.add_command(label= 'Save', command=save_text)
-sub_menu1.add_separator()
-sub_menu1.add_command(label= 'Save AS', command=save_text)
-sub_menu1.add_command(label= 'Exit', command=exit_confirm)
+    def login_submit():
+        global login_flag
+        conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
+        cursor = conn.cursor()
+        cursor.execute("select *from users")
+        row = cursor.fetchall()
+        try:
+            for i in row:
+                if i[0] == loginid.get() and i[1] == passW.get():
+                    tmsg.showinfo('Authentication', 'Login Successful')
+                    login_flag = 1
+                    lg.destroy()
+                    break
+            else:
+                tmsg.showerror('Authentication', 'User Id or password incorrect')
+                login_flag = 0
+        finally:
+            cursor.close()
+            conn.close()
 
-sub_menu2 = Menu(main_menu, tearoff=0)
-sub_menu2.add_command(label='Help', command=helpDesk)
-sub_menu2.add_command(label='Check for update', command=checkUpdate)
-sub_menu2.add_command(label='Feedback', command=contribute)
+    def sign_up():
+        conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
+        cursor = conn.cursor()
+        cursor.execute("select *from users")
+        row = cursor.fetchall()
 
-root.config(menu=main_menu)
-main_menu.add_cascade(label='File', menu=sub_menu1)
-main_menu.add_cascade(label='About', menu=sub_menu2)
-# menu close
+        try:
+            for i in row:
+                if i[0] == loginid.get():
+                    tmsg.showinfo('Sign UP', 'User ID already exists')
+                    break
+            else:
+                cursor.execute("insert into users (userID, pswd) values (%s, %s)" %(loginid.get(), passW.get()))
+                conn.commit()
+                tmsg.showinfo('Sign UP', 'User registered successfully')
+        finally:
+            cursor.close()
+            conn.close()
 
-# img_button_green = PhotoImage(file='green pill.png')
-# img_button_red = PhotoImage(file='red button.png')
-# img_button_yellow = PhotoImage(file='yellow button.png')
-# img_button_blue = PhotoImage(file='blue pill.png.')
 
-frame_top = Frame(root, borderwidth=8, bg='light yellow', relief=RIDGE)
-frame_top.pack(side=TOP, anchor='nw', fill=X)
+    Label(lg, text='Username/ID: ').grid(row=1, column=0, padx=10, pady=10)
+    Entry(lg, textvariable=loginid, width=35).grid(row=1, column=1)
+    Label(lg, text='Password: ').grid(row=2, column=0, padx=10, pady=2)
+    Entry(lg, textvariable=passW, width=35).grid(row=2, column=1, pady=2)
+    Button(lg, text='LOGIN', command=login_submit).grid(row=3, column=1, columnspan=1, padx=50, pady=10, sticky=W)
+    Button(lg, text='SIGN-UP', command=sign_up).grid(row=3, column=1, sticky=E, padx=50, pady=10)
 
-camera_button = Button(frame_top, text='Open Camera', command=camera).grid(padx=10, pady=10, row=1, column=1)
+    bg = PhotoImage(master=lg, file='ICON.png')
+    Label(lg, image=bg).grid(row=5, column=0, columnspan=2, sticky=E)
 
-browse_button = Button(frame_top, text='Browse file...  ', command=browse).grid(row=2, column=1, padx=10, pady='10')
-browse_text = Entry(frame_top, width=100)
-browse_text.insert(0, '')
-browse_text.grid(row=2, column=2)
-open_button = Button(frame_top, text='Open & Convert', width=13, command=convert).grid(row=2, column=6, padx=20)
+    lg.mainloop()
 
-frame_mid = Frame(root, borderwidth=8, bg='light yellow', relief=RIDGE)
-frame_mid.pack(side=TOP, fill =X, pady=2)
+login()
 
-Label(frame_mid, text='Extracted Text...').pack(anchor='nw')
+if login_flag == 1:
+    root = Tk()
+    root.geometry('1080x720')
+    root.title('Digital OCR')
 
-show_text = scrolledtext.ScrolledText(frame_mid, undo=True, height=15)
-show_text['font'] = ('lucidas', '13')
-show_text.pack(fill=X, padx=2, pady=5)
+    photo = PhotoImage(master=root, file='ICON.png')
+    root.iconphoto(False, photo)
 
-save_txt_button = Button(frame_mid, text='Save file...', width=13, command=save_text).pack(side=RIGHT, padx=10, pady=10)
-clear_txt_button = Button(frame_mid, text='Clear text', command=clearTxt, width=13).pack(side=RIGHT, padx=10)
-frame_bottom = Frame(root, relief=FLAT, bg='light yellow', borderwidth=10)
-frame_bottom.pack(side=BOTTOM, fill=BOTH, expand=True)
+    # menu
+    main_menu = Menu(root)
+    sub_menu1 = Menu(main_menu, tearoff=0)
+    sub_menu1.add_command(label='Open File', command=browse)
+    sub_menu1.add_command(label='Save', command=save_text)
+    sub_menu1.add_separator()
+    sub_menu1.add_command(label='Save As', command=save_text)
+    sub_menu1.add_command(label='Exit', command=exit_confirm)
 
-#status bar
-statusVar = StringVar()
-statusVar.set("Ready")
-sbar = Label(frame_bottom, textvariable=statusVar, relief=SUNKEN, anchor='w')
-sbar.pack(side=BOTTOM, fill=X)
+    sub_menu2 = Menu(main_menu, tearoff=0)
+    sub_menu2.add_command(label='Help', command=helpDesk)
+    sub_menu2.add_command(label='Check for update', command=checkUpdate)
+    sub_menu2.add_command(label='Feedback', command=contribute)
 
-exit_button = Button(frame_bottom, text='Exit', width=13, command=exit_confirm).pack(anchor='se', side=RIGHT, padx=10, pady=12)
-convert_button = Button(frame_bottom, text='Convert', width=13, command=convert).pack(anchor="se", side=RIGHT, padx=10, pady=12)
+    root.config(menu=main_menu)
+    main_menu.add_cascade(label='File', menu=sub_menu1)
+    main_menu.add_cascade(label='About', menu=sub_menu2)
+    # menu close
 
-root.mainloop()
+    img_button_green = PhotoImage(master=root, file='green pill.png')
+
+    frame_top = Frame(root, borderwidth=8, bg='light yellow', relief=RIDGE)
+    frame_top.pack(side=TOP, anchor='nw', fill=X)
+
+    camera_button = Button(frame_top, image=img_button_green, borderwidth=0, height=30, width=100, command=camera).grid(
+        padx=10, pady=10, row=1, column=1)
+
+    browse_button = Button(frame_top, text='Browse file...  ', command=browse).grid(row=2, column=1, padx=10, pady='10')
+    browse_text = Entry(frame_top, width=100)
+    browse_text.insert(0, '')
+    browse_text.grid(row=2, column=2)
+    open_button = Button(frame_top, text='Open & Convert', width=13, command=convert).grid(row=2, column=6, padx=20)
+
+    frame_mid = Frame(root, borderwidth=8, bg='light yellow', relief=RIDGE)
+    frame_mid.pack(side=TOP, fill=X, pady=2)
+
+    Label(frame_mid, text='Extracted Text...', bg='light yellow').pack(anchor='nw', padx=10)
+
+    show_text = scrolledtext.ScrolledText(frame_mid, undo=True, height=15)
+    show_text['font'] = ('lucidas', '13')
+    show_text.pack(fill=X, padx=2, pady=5)
+
+    save_txt_button = Button(frame_mid, text='Save file...', width=13, command=save_text).pack(side=RIGHT, padx=10,
+                                                                                               pady=10)
+    clear_txt_button = Button(frame_mid, text='Clear text', command=clearTxt, width=13).pack(side=RIGHT, padx=10)
+    frame_bottom = Frame(root, relief=FLAT, bg='light yellow', borderwidth=10)
+    frame_bottom.pack(side=BOTTOM, fill=BOTH, expand=True)
+
+    # status bar
+    statusVar = StringVar()
+    statusVar.set("Ready")
+    sbar = Label(frame_bottom, textvariable=statusVar, relief=SUNKEN, anchor='w')
+    sbar.pack(side=BOTTOM, fill=X)
+
+    exit_button = Button(frame_bottom, text='Exit', width=13, command=exit_confirm).pack(anchor='se', side=RIGHT,
+                                                                                         padx=10, pady=12)
+    convert_button = Button(frame_bottom, text='Convert', width=13, command=convert).pack(anchor="se", side=RIGHT,
+                                                                                          padx=10, pady=12)
+
+    root.mainloop()

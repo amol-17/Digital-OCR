@@ -6,6 +6,7 @@ import cv2
 import pytesseract
 from PIL import Image
 import mysql.connector
+from firebase import firebase # note change async to async_ in __init__.py and firebase.py of firebase package
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 cong = r'--oem 2 --psm 6'
@@ -163,32 +164,58 @@ def login():
     passW = StringVar()
 
     def login_submit():
-        global login_flag
-        conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
-        cursor = conn.cursor()
-        cursor.execute("select *from users")
-        row = cursor.fetchall()
         try:
-            for i in row:
-                if i[0] == loginid.get() and i[1] == passW.get():
-                    tmsg.showinfo('Authentication', 'Login Successful')
-                    login_flag = 1
-                    lg.destroy()
-                    break
+            global login_flag
+            conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
+            cursor = conn.cursor()
+            cursor.execute("select *from users")
+            row = cursor.fetchall()
+            try:
+                for i in row:
+                    if i[0] == loginid.get() and i[1] == passW.get():
+                        tmsg.showinfo('Authentication', 'Login Successful')
+                        login_flag = 1
+                        lg.destroy()
+                        break
+                else:
+                    tmsg.showerror('Authentication', 'User Id or password incorrect')
+                    login_flag = 0
+            finally:
+                cursor.close()
+                conn.close()
+        except:
+            fyrebase = firebase.FirebaseApplication("https://ocr-a9bb1.firebaseio.com/", None)
+            result = fyrebase.get("https://ocr-a9bb1.firebaseio.com/login", '')
+            rows = result.values()
+            ID_list = []
+            for row in rows:
+                ID_list.append(row['userID'])
+
+            if loginid.get() in ID_list:
+                for row in rows:
+                    if row['userID'] == loginid.get():
+                        if row['pswd'] == passW.get():
+                            tmsg.showinfo('Success', 'You are logged in successfully.')
+                            login_flag =1
+                            lg.destroy()
+                            break
+                        else:
+                            
+                            tmsg.showerror('Authentication', "Incorrect Password")
+                            login_flag = 0
+                    else:
+                        print()
             else:
-                tmsg.showerror('Authentication', 'User Id or password incorrect')
-                login_flag = 0
-        finally:
-            cursor.close()
-            conn.close()
-
+                tmsg.showinfo('login', "User doesn't exist.")
+    
     def sign_up():
-        conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
-        cursor = conn.cursor()
-        cursor.execute("select *from users")
-        row = cursor.fetchall()
-
         try:
+            conn = mysql.connector.connect(host='localhost', user='root', password='1111', database='ocr')
+            cursor = conn.cursor()
+            cursor.execute("select *from users")
+            row = cursor.fetchall()
+
+        
             for i in row:
                 if i[0] == loginid.get():
                     tmsg.showinfo('Sign UP', 'User ID already exists')
@@ -197,10 +224,27 @@ def login():
                 cursor.execute("insert into users (userID, pswd) values (%s, %s)" %(loginid.get(), passW.get()))
                 conn.commit()
                 tmsg.showinfo('Sign UP', 'User registered successfully')
-        finally:
+            
             cursor.close()
             conn.close()
-
+        except:
+            
+            fyrebase = firebase.FirebaseApplication("https://ocr-a9bb1.firebaseio.com/", None)
+            result = fyrebase.get("https://ocr-a9bb1.firebaseio.com/login",'')
+            rows = result.values()
+            userIDDs = []
+            for row in rows:
+                userIDDs.append(row['userID'])
+            if loginid.get() in userIDDs:
+                tmsg.showerror('Sign Up','user ID already exists')
+            else:
+                data={
+                    "userID": f"{loginid.get()}",
+                    "pswd": f"{passW.get()}"
+                }
+                fyrebase.post("https://ocr-a9bb1.firebaseio.com/login",data)
+                tmsg.showinfo('Sign UP', 'User registered successfully')
+            
 
     Label(lg, text='Username/ID: ').grid(row=1, column=0, padx=10, pady=10)
     Entry(lg, textvariable=loginid, width=35).grid(row=1, column=1)
@@ -209,8 +253,8 @@ def login():
     Button(lg, text='LOGIN', command=login_submit).grid(row=3, column=1, columnspan=1, padx=50, pady=10, sticky=W)
     Button(lg, text='SIGN-UP', command=sign_up).grid(row=3, column=1, sticky=E, padx=50, pady=10)
 
-    bg = PhotoImage(master=lg, file='ICON.png')
-    Label(lg, image=bg).grid(row=5, column=0, columnspan=2, sticky=E)
+    #bg = PhotoImage(master=lg, file='ICON.png')
+    #Label(lg, image=bg).grid(row=5, column=0, columnspan=2, sticky=E)
 
     lg.mainloop()
 

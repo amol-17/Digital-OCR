@@ -253,8 +253,8 @@ def login():
     Button(lg, text='LOGIN', command=login_submit).grid(row=3, column=1, columnspan=1, padx=50, pady=10, sticky=W)
     Button(lg, text='SIGN-UP', command=sign_up).grid(row=3, column=1, sticky=E, padx=50, pady=10)
 
-    #bg = PhotoImage(master=lg, file='ICON.png')
-    #Label(lg, image=bg).grid(row=5, column=0, columnspan=2, sticky=E)
+    bg = PhotoImage(master=lg, file='ICON.png')
+    Label(lg, image=bg).grid(row=5, column=0, columnspan=2, sticky=E)
 
     lg.mainloop()
 
